@@ -38,6 +38,30 @@ tools = types.Tool(
                 required=["artist_name"],
             ),
         ),
+        types.FunctionDeclaration(
+            name="song_chords_tutorial",
+            description="Get a YouTube link to a guitar chord tutorial for a song.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "song_name": types.Schema(type=types.Type.STRING),
+                    "artist": types.Schema(type=types.Type.STRING),
+                },
+                required=["song_name", "artist"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="similar_songs",
+            description="Get the names of 5 songs similar to a given song and artist.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "song_name": types.Schema(type=types.Type.STRING),
+                    "artist_name": types.Schema(type=types.Type.STRING),
+                },
+                required=["song_name", "artist_name"],
+            ),
+        ),
     ]
 )
 
@@ -45,9 +69,7 @@ tools = types.Tool(
 async def ask_gemini(question: str) -> str:
     gemini = genai.Client(api_key=GEMINI_API_KEY)
     system_prompt = """
-                    You are a music assistant. Given a question, 
-                    use the tools specified to answer the question. 
-                    If you cannot answer the questions using the tools, then give a response yourself.
+                    You are a music assistant. Given a question, use the tools specified to answer the question. If the tools cannot answer the question, then answer the question without them.
                     """
     config = types.GenerateContentConfig(tools=[tools], system_instruction=system_prompt)
 
@@ -70,10 +92,12 @@ async def ask_gemini(question: str) -> str:
                 fn_responses = []
                 for part in fn_calls:
                     fc = part.function_call
+                    print(f"[Tool Call] {fc.name}({', '.join(f'{k}={v!r}' for k, v in dict(fc.args).items())})")
                     result = await session.call_tool(fc.name, dict(fc.args))
                     result_text = " ".join(
                         c.text for c in result.content if hasattr(c, "text")
                     )
+                    print(f"[Tool Result] {result_text}")
                     fn_responses.append(
                         types.Part.from_function_response(
                             name=fc.name,
