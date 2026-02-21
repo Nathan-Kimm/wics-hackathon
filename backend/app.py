@@ -1,4 +1,5 @@
 from flask import Flask, redirect, request, session, jsonify, url_for
+from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 import requests
@@ -8,6 +9,7 @@ import secrets
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
+CORS(app, supports_credentials=True)  # Enable CORS with credentials for Chrome extension
 
 load_dotenv()
 
@@ -100,7 +102,6 @@ def current_track():
     track_name = track_data["item"]["name"]
     artist_name = track_data["item"]["artists"][0]["name"]
     album_cover = track_data["item"]["album"]["images"][0]["url"]
-    print(track_data)
 
     return jsonify({
         "track": track_name,
