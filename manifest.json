@@ -7,9 +7,9 @@
   "action": {
     "default_popup": "extension/authentication.html",
     "default_icon": {
-      "16": "spotichrd.png",
-      "48": "spotichrd.png",
-      "128": "spotichrd.png"
+      "16": "./files/spotichrd.png",
+      "48": "./files/spotichrd.png",
+      "128": "./files/spotichrd.png"
     }
   }
 }
