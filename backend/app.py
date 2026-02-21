@@ -1,19 +1,37 @@
 from flask import Flask, redirect, request, session, jsonify, url_for
 import os
+from dotenv import load_dotenv
 import requests
 import base64
 import urllib.parse
 import secrets
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
 
-CLIENT_ID = ""
-CLIENT_SECRET = ""
+load_dotenv()
+
+CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 REDIRECT_URI = "http://127.0.0.1:5000/callback"
+SCOPE = "user-read-currently-playing user-read-playback-state"
 
 AUTH_URL = "https://accounts.spotify.com/authorize"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 API_BASE = "https://api.spotify.com/v1"
+
+@app.route("/")
+def index():
+    if "access_token" in session:
+        return jsonify({
+            "status": "authenticated",
+            "message": "You are logged in!",
+            "endpoints": {
+                "/current_track": "Get currently playing track",
+                "/login": "Re-authenticate"
+            }
+        })
+    return redirect(url_for("login"))
 
 @app.route("/login")
 def login():
@@ -63,7 +81,7 @@ def callback():
     return "Authentication successful! You can now fetch track info at /current_track"
 
 # ----------------------
-# Step 3: Fetch current track + audio features
+# Step 3: Fetch current track
 # ----------------------
 @app.route("/current_track")
 def current_track():
@@ -79,25 +97,15 @@ def current_track():
         return jsonify({"error": "No track playing"}), 404
 
     track_data = r.json()
-    track_id = track_data["item"]["id"]
     track_name = track_data["item"]["name"]
     artist_name = track_data["item"]["artists"][0]["name"]
-
-    # Get audio features
-    r_feat = requests.get(f"{API_BASE}/audio-features/{track_id}", headers=headers)
-    features = r_feat.json()
-    key = features["key"]
-    mode = features["mode"]
-
-    # Generate fallback chord suggestions
-    chords = generate_chords_from_key(key, mode)
+    album_cover = track_data["item"]["album"]["images"][0]["url"]
+    print(track_data)
 
     return jsonify({
         "track": track_name,
         "artist": artist_name,
-        "key": key,
-        "mode": mode,
-        "chords": chords
+        "album_cover": album_cover
     })
 
 # ----------------------
@@ -117,4 +125,20 @@ def generate_chords_from_key(key, mode):
 # Step 5: Run app
 # ----------------------
 if __name__ == "__main__":
+    # Validate environment variables
+    if not CLIENT_ID or not CLIENT_SECRET:
+        print("\n❌ Error: Spotify credentials not set!")
+        print("\nPlease set the following environment variables:")
+        print("  export SPOTIFY_CLIENT_ID='your-client-id'")
+        print("  export SPOTIFY_CLIENT_SECRET='your-client-secret'")
+        print("\nGet credentials at: https://developer.spotify.com/dashboard")
+        print("Make sure to add redirect URI: http://127.0.0.1:5000/callback")
+        exit(1)
+
+    print("\n✓ Spotify credentials loaded")
+    print(f"✓ Redirect URI: {REDIRECT_URI}")
+    print(f"✓ Scope: {SCOPE}")
+    print("\nStarting Flask app...")
+    print("Visit: http://127.0.0.1:5000/login to authenticate\n")
+
     app.run(debug=True)
