@@ -1,90 +1,87 @@
-# client.py
-
 import asyncio
-import json
+from mcp import ClientSession
+from mcp.client.sse import sse_client
+from google import genai
+from google.genai import types
 import os
-import sys
-import google.generativeai as genai
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
 
-# Configure Gemini
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    print("Error: GEMINI_API_KEY environment variable not set")
-    print("\nPlease set your Gemini API key:")
-    print("  export GEMINI_API_KEY='your-api-key-here'")
-    print("\nGet an API key at: https://aistudio.google.com/apikey")
-    sys.exit(1)
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+MCP_SERVER_URL = "http://localhost:8000/sse"
+MAX_ITERATIONS = 10
 
-genai.configure(api_key=api_key)
-
-# Server parameters
-server_params = StdioServerParameters(
-    command=sys.executable,
-    args=[os.path.join(os.path.dirname(__file__), "server.py")],
+tools = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="song_info",
+            description="Get information about a song by name.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={"song_name": types.Schema(type=types.Type.STRING)},
+                required=["song_name"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="artist_info",
+            description="Get information about an artist by name.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={"artist_name": types.Schema(type=types.Type.STRING)},
+                required=["artist_name"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="similar_artists",
+            description="Get the top 5 most similar artists to a given artist.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={"artist_name": types.Schema(type=types.Type.STRING)},
+                required=["artist_name"],
+            ),
+        ),
+    ]
 )
 
 
-async def run():
-    async with stdio_client(server_params) as (read, write):
+async def ask_gemini(question: str) -> str:
+    gemini = genai.Client(api_key=GEMINI_API_KEY)
+    config = types.GenerateContentConfig(tools=[tools])
+
+    async with sse_client(MCP_SERVER_URL) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
 
-            # List available tools from MCP server
-            tools_result = await session.list_tools()
+            chat = gemini.aio.chats.create(model="gemini-2.5-flash", config=config)
+            response = await chat.send_message(question)
 
-            # Convert MCP tools to Gemini function declarations
-            gemini_tools = []
-            for tool in tools_result.tools:
-                gemini_tool = {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.inputSchema
-                }
-                gemini_tools.append(gemini_tool)
+            for _ in range(MAX_ITERATIONS):
+                fn_calls = [
+                    p for p in response.candidates[0].content.parts
+                    if p.function_call
+                ]
 
-            # Create model with tools
-            model_with_tools = genai.GenerativeModel(
-                "gemini-2.5-flash",
-                tools=[gemini_tools]
-            )
+                if not fn_calls:
+                    return response.text
 
-            query = input("Ask about a song: ")
-            chat = model_with_tools.start_chat()
-
-            max_iterations = 10
-            for i in range(max_iterations):
-                response = chat.send_message(query)
-
-                # Check if model wants to call a function
-                if response.candidates[0].content.parts[0].function_call:
-                    function_call = response.candidates[0].content.parts[0].function_call
-
-                    print(f"\nCalling tool: {function_call.name}")
-                    print(f"Arguments: {dict(function_call.args)}")
-
-                    # Call the MCP tool
-                    tool_result = await session.call_tool(
-                        function_call.name,
-                        arguments=dict(function_call.args)
+                fn_responses = []
+                for part in fn_calls:
+                    fc = part.function_call
+                    result = await session.call_tool(fc.name, dict(fc.args))
+                    result_text = " ".join(
+                        c.text for c in result.content if hasattr(c, "text")
                     )
-
-                    # Send result back to Gemini
-                    function_response = genai.protos.Part(
-                        function_response=genai.protos.FunctionResponse(
-                            name=function_call.name,
-                            response={"result": tool_result.content}
+                    fn_responses.append(
+                        types.Part.from_function_response(
+                            name=fc.name,
+                            response={"result": result_text},
                         )
                     )
 
-                    query = function_response
-                else:
-                    # No more function calls, print final response
-                    print("\nFinal Response:")
-                    print(response.text)
-                    break
+                response = await chat.send_message(fn_responses)
+
+    return response.text
 
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    question = input("Query: ")
+    answer = asyncio.run(ask_gemini(question))
+    print(answer)
