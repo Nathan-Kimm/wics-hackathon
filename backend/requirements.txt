@@ -5,4 +5,4 @@ requests==2.32.3
 mcp==1.26.0
 google-genai==1.10.0
 beautifulsoup4==4.12.3
-fastmcp==2.3.4
+fastmcp==2.14.5
