@@ -1,11 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="./main.css">
 </head>
 <body>
     <div id="container">
-        <h1>Spotify</h1>
+        <h1 id="rainbow-title">spotichrd</h1>
+        <div id="current-track">
+            <img id="album-image" src="" alt="Album cover" style="width: 60px; height: 60px; border-radius: 4px; display: none;">
+            <div id="track-info">
+                <div id="track-name">No track playing</div>
+                <div id="artist-name"></div>
+            </div>
+        </div>
+        <div id="chords-section">
+            <h2>Progression:</h2>
+            <div id="chords-list"></div>
+        </div>
     </div>
 </body>
 </html>
