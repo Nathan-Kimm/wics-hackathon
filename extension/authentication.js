@@ -20,10 +20,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     statusMessage.textContent = 'Ready to connect';
                 }
             })
-            .catch(error => {
-                console.log('Backend not running or not authenticated');
-                statusMessage.textContent = 'Make sure Flask backend is running';
-            });
     }
 
     setInterval(checkAuthStatus, 3000);
