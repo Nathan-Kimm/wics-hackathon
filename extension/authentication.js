@@ -20,6 +20,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     statusMessage.textContent = 'Ready to connect';
                 }
             })
+            .catch(error => {
+                console.log('Backend not running or authenticated');
+                statusMessage.textContent = 'Make sure backend is running';
+            });
     }
 
     setInterval(checkAuthStatus, 3000);
