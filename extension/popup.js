@@ -2,7 +2,7 @@
 async function updateCurrentTrack() {
     try {
         const response = await fetch('http://127.0.0.1:5000/current_track', {
-            credentials: 'include'  // Include cookies in the request
+            credentials: 'include' 
         });
 
         if (!response.ok) {
@@ -46,6 +46,6 @@ function showError(message) {
 document.addEventListener('DOMContentLoaded', () => {
     updateCurrentTrack();
 
-    // Optionally refresh every 5 seconds
-    setInterval(updateCurrentTrack, 5000);
+    // Optionally refresh every 3 seconds
+    setInterval(updateCurrentTrack, 3000);
 });

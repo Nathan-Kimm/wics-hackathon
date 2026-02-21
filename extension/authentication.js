@@ -14,10 +14,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function checkAuthStatus() {
         fetch('http://127.0.0.1:5000/current_track')
             .then(response => {
-                if (response.ok) {
+                console.log(response);
+                if (response.status == "404" || response.ok) {
                     window.location.href = 'popup.html';
-                } else {
-                    statusMessage.textContent = 'Ready to connect';
                 }
             })
             .catch(error => {
