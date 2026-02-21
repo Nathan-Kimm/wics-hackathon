@@ -10,7 +10,7 @@
 
 body {
   width: 400px;
-  height: 200px;
+  height: 550px;
   overflow: hidden;
 }
 
@@ -21,6 +21,12 @@ body {
     background-color: var(--main-bg);
     border: 1px solid var(--secondary-bg);
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+#top-section {
+    flex-shrink: 0;
 }
 
 h1 {
@@ -113,6 +119,112 @@ h2 {
     border-radius: 4px;
     font-size: 0.9em;
     font-weight: 600;
+}
+
+/* ── Divider ── */
+#divider {
+    border: none;
+    border-top: 1.5px solid var(--secondary-bg);
+    margin: 48px 0 16px 0;
+}
+
+/* ── Chat UI ── */
+#chat-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+}
+
+#chat-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+}
+
+#chat-messages::-webkit-scrollbar {
+    width: 4px;
+}
+#chat-messages::-webkit-scrollbar-thumb {
+    background: var(--secondary-bg);
+    border-radius: 2px;
+}
+
+.chat-bubble {
+    max-width: 82%;
+    padding: 7px 11px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.chat-bubble.user {
+    align-self: flex-end;
+    background-color: var(--main-text);
+    color: var(--main-bg);
+    border-bottom-right-radius: 3px;
+}
+
+.chat-bubble.bot {
+    align-self: flex-start;
+    background-color: var(--secondary-bg);
+    color: var(--main-text);
+    border-bottom-left-radius: 3px;
+}
+
+#chat-input-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 4px;
+}
+
+#chat-input {
+    flex: 1;
+    padding: 7px 10px;
+    border: 1.5px solid var(--secondary-bg);
+    border-radius: 8px;
+    background-color: var(--secondary-bg);
+    color: var(--main-text);
+    font-size: 0.85em;
+    font-family: 'Noto Sans Mono', monospace;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+#chat-input:focus {
+    border-color: var(--main-text);
+}
+
+#chat-input::placeholder {
+    color: var(--secondary-text);
+}
+
+#chat-send {
+    background-color: var(--main-text);
+    color: var(--main-bg);
+    border: none;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: opacity 0.2s, transform 0.15s;
+}
+
+#chat-send:hover {
+    opacity: 0.75;
+    transform: scale(1.08);
 }
 
 
