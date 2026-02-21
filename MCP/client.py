@@ -31,7 +31,7 @@ tools = types.Tool(
         ),
         types.FunctionDeclaration(
             name="similar_artists",
-            description="Get the top 5 most similar artists to a given artist.",
+            description="Given an artist name, get the top 5 most similar artists.",
             parameters=types.Schema(
                 type=types.Type.OBJECT,
                 properties={"artist_name": types.Schema(type=types.Type.STRING)},
@@ -44,7 +44,12 @@ tools = types.Tool(
 
 async def ask_gemini(question: str) -> str:
     gemini = genai.Client(api_key=GEMINI_API_KEY)
-    config = types.GenerateContentConfig(tools=[tools])
+    system_prompt = """
+                    You are a music assistant. Given a question, 
+                    use the tools specified to answer the question. 
+                    If you cannot answer the questions using the tools, then give a response yourself.
+                    """
+    config = types.GenerateContentConfig(tools=[tools], system_instruction=system_prompt)
 
     async with sse_client(MCP_SERVER_URL) as (read, write):
         async with ClientSession(read, write) as session:
