@@ -50,7 +50,7 @@ async def ask_gemini(question: str) -> str:
         async with ClientSession(read, write) as session:
             await session.initialize()
 
-            chat = gemini.aio.chats.create(model="gemini-2.5-flash", config=config)
+            chat = gemini.aio.chats.create(model="gemini-2.5-flash-lite", config=config)
             response = await chat.send_message(question)
 
             for _ in range(MAX_ITERATIONS):
