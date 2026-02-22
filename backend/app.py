@@ -1,6 +1,8 @@
 from flask import Flask, redirect, request, session, jsonify, url_for
 from flask_cors import CORS
 import os
+import sys
+import asyncio
 from dotenv import load_dotenv
 import requests
 import base64
@@ -8,7 +10,10 @@ import urllib.parse
 import secrets
 import json
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'MCP'))
+from client import ask_gemini
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
@@ -102,6 +107,23 @@ def current_track():
         "album_cover": album_cover
     })
 
+@app.route("/chat", methods=["POST"])
+def chat():
+    body = request.get_json(silent=True) or {}
+    message = body.get("message", "").strip()
+    if not message:
+        return jsonify({"error": "No message provided"}), 400
+
+    try:
+        reply = asyncio.run(ask_gemini(message))
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def generate_chords_from_key(key, mode):
+    note_names = ["C", "C#", "D", "D#", "E", "F",
+                  "F#", "G", "G#", "A", "A#", "B"]
+    root = note_names[key]
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F",
               "F#", "G", "G#", "A", "A#", "B"]
 

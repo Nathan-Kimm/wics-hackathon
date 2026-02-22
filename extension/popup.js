@@ -68,6 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
         input.value = '';
         appendBubble(text, 'user');
 
+        // Show a thinking indicator
+        const messages = document.getElementById('chat-messages');
+        const thinking = document.createElement('div');
+        thinking.classList.add('chat-bubble', 'bot');
+        thinking.textContent = 'Thinking...';
+        messages.appendChild(thinking);
+        messages.scrollTop = messages.scrollHeight;
+
         try {
             const response = await fetch('http://127.0.0.1:5000/chat', {
                 method: 'POST',
@@ -78,8 +86,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
-            appendBubble(data.reply || data.message || JSON.stringify(data), 'bot');
+            thinking.remove();
+            appendBubble(data.reply || data.error || JSON.stringify(data), 'bot');
         } catch (err) {
+            thinking.remove();
             appendBubble('Error: ' + err.message, 'bot');
         }
     }
