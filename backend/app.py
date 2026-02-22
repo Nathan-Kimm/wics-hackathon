@@ -1,17 +1,22 @@
 from flask import Flask, redirect, request, session, jsonify, url_for
 from flask_cors import CORS
 import os
+import sys
+import asyncio
 from dotenv import load_dotenv
 import requests
 import base64
 import urllib.parse
 import secrets
 
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'MCP'))
+from client import ask_gemini
+
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
 CORS(app, supports_credentials=True)  # Enable CORS with credentials for Chrome extension
-
-load_dotenv()
 
 CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
@@ -110,7 +115,23 @@ def current_track():
     })
 
 # ----------------------
-# Step 4: Fallback chord generation
+# Step 4: Chat endpoint (Gemini + MCP)
+# ----------------------
+@app.route("/chat", methods=["POST"])
+def chat():
+    body = request.get_json(silent=True) or {}
+    message = body.get("message", "").strip()
+    if not message:
+        return jsonify({"error": "No message provided"}), 400
+
+    try:
+        reply = asyncio.run(ask_gemini(message))
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ----------------------
+# Step 5: Fallback chord generation
 # ----------------------
 def generate_chords_from_key(key, mode):
     note_names = ["C", "C#", "D", "D#", "E", "F",
@@ -123,7 +144,7 @@ def generate_chords_from_key(key, mode):
         return [f"{root}m", f"{root}m – VI", f"{root}m – III", f"{root}m – VII"]
 
 # ----------------------
-# Step 5: Run app
+# Step 6: Run app
 # ----------------------
 if __name__ == "__main__":
     # Validate environment variables
