@@ -2,7 +2,7 @@
 async function updateCurrentTrack() {
     try {
         const response = await fetch('http://127.0.0.1:5000/current_track', {
-            credentials: 'include' 
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -30,9 +30,42 @@ async function updateCurrentTrack() {
         albumImage.src = data.album_cover;
         albumImage.style.display = 'block';
 
+        // Fetch chords for the current track
+        updateChords();
+
     } catch (error) {
         console.error('Error fetching track:', error);
         showError('Failed to connect to Spotify API');
+    }
+}
+
+// Fetch and display chords
+async function updateChords() {
+    try {
+        const response = await fetch('http://127.0.0.1:5000/get_chords', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            console.error('Failed to fetch chords');
+            return;
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.chords) {
+            const chordsList = document.getElementById('chords-list');
+            chordsList.innerHTML = ''; // Clear existing chords
+
+            data.chords.forEach(chord => {
+                const chordElement = document.createElement('div');
+                chordElement.classList.add('chord');
+                chordElement.textContent = chord;
+                chordsList.appendChild(chordElement);
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching chords:', error);
     }
 }
 
