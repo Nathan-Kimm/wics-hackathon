@@ -6,15 +6,19 @@ import requests
 import base64
 import urllib.parse
 import secrets
-
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
-CORS(app, supports_credentials=True)  # Enable CORS with credentials for Chrome extension
+import json
 
 load_dotenv()
 
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
+CORS(app, supports_credentials=True) 
+
+# API Keys
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+
 REDIRECT_URI = "http://127.0.0.1:5000/callback"
 SCOPE = "user-read-currently-playing user-read-playback-state"
 
@@ -22,17 +26,12 @@ AUTH_URL = "https://accounts.spotify.com/authorize"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 API_BASE = "https://api.spotify.com/v1"
 
+CHORD_CACHE = {}
+
 @app.route("/")
 def index():
     if "access_token" in session:
-        return jsonify({
-            "status": "authenticated",
-            "message": "You are logged in!",
-            "endpoints": {
-                "/current_track": "Get currently playing track",
-                "/login": "Re-authenticate"
-            }
-        })
+        return jsonify({"status": "authenticated"})
     return redirect(url_for("login"))
 
 @app.route("/login")
@@ -51,9 +50,6 @@ def login():
     auth_url = f"{AUTH_URL}?{urllib.parse.urlencode(params)}"
     return redirect(auth_url)
 
-# ----------------------
-# Step 2: Callback route
-# ----------------------
 @app.route("/callback")
 def callback():
     code = request.args.get("code")
@@ -82,9 +78,6 @@ def callback():
 
     return "Authentication successful! You can now fetch track info at /current_track"
 
-# ----------------------
-# Step 3: Fetch current track
-# ----------------------
 @app.route("/current_track")
 def current_track():
     access_token = session.get("access_token")
@@ -109,26 +102,135 @@ def current_track():
         "album_cover": album_cover
     })
 
-# ----------------------
-# Step 4: Fallback chord generation
-# ----------------------
-def generate_chords_from_key(key, mode):
-    note_names = ["C", "C#", "D", "D#", "E", "F",
-                  "F#", "G", "G#", "A", "A#", "B"]
-    root = note_names[key]
+NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F",
+              "F#", "G", "G#", "A", "A#", "B"]
+
+MAJOR_PROGRESSIONS = [
+    [0, 5, 3, 4],   # I–V–vi–IV (most common pop)
+    [0, 3, 4, 5],   # I–vi–IV–V
+]
+
+MINOR_PROGRESSIONS = [
+    [0, 3, 4, 2],   # i–VI–VII–v
+    [0, 5, 3, 4],   # i–V–VI–VII
+]
+
+def build_chords(root_index, mode):
+    root = NOTE_NAMES[root_index]
 
     if mode == 1:  # Major
-        return [f"{root}", f"{root} – V", f"{root} – vi", f"{root} – IV"]
+        progression = MAJOR_PROGRESSIONS[0]
+        scale = NOTE_NAMES
+        chords = [
+            scale[(root_index + progression[0]) % 12],
+            scale[(root_index + progression[1]) % 12],
+            scale[(root_index + progression[2]) % 12] + "m",
+            scale[(root_index + progression[3]) % 12],
+        ]
     else:  # Minor
-        return [f"{root}m", f"{root}m – VI", f"{root}m – III", f"{root}m – VII"]
+        progression = MINOR_PROGRESSIONS[0]
+        scale = NOTE_NAMES
+        chords = [
+            scale[(root_index + progression[0]) % 12] + "m",
+            scale[(root_index + progression[1]) % 12],
+            scale[(root_index + progression[2]) % 12],
+            scale[(root_index + progression[3]) % 12] + "m",
+        ]
 
-# ----------------------
-# Step 5: Run app
-# ----------------------
+    return chords
+
+def get_current_track(access_token):
+    headers = {"Authorization": f"Bearer {access_token}"}
+    r = requests.get(f"{API_BASE}/me/player/currently-playing", headers=headers)
+
+    if r.status_code != 200:
+        return None
+
+    data = r.json()
+    item = data.get("item")
+
+    if not item:
+        return None
+
+    return {
+        "id": item["id"],
+        "name": item["name"],
+        "artist": item["artists"][0]["name"]
+    }
+
+@app.route("/get_chords")
+def get_chords():
+    access_token = session.get("access_token")
+
+    if not access_token:
+        return jsonify({"success": False, "message": "Not authenticated"})
+
+    track = get_current_track(access_token)
+
+    if not track:
+        return jsonify({"success": False, "message": "Nothing playing"})
+
+    track_id = track["id"]
+    track_name = track["name"]
+    artist_name = track["artist"]
+
+    if track_id in CHORD_CACHE:
+        chords = CHORD_CACHE[track_id]
+    else:
+        chords = get_chords_from_gemini(track_name, artist_name)
+        CHORD_CACHE[track_id] = chords
+
+    if not chords:
+        return jsonify({"success": False, "message": "Could not determine chords"})
+
+
+    return jsonify({
+        "success": True,
+        "song": track_name,
+        "artist": artist_name,
+        "chords": chords,
+    })
+
+def get_chords_from_gemini(track_name, artist_name):
+    prompt = f'''
+    Give me the main repeating chord progression for the song "{track_name}" by {artist_name}.
+    
+    Return only a JSON array of chord names.
+    Do not include markdown.
+    Do not use backticks
+    Example: ["Em", "G", "D", "A"]
+    '''
+
+    r = requests.post(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent",
+        params={"key": GEMINI_API_KEY},
+        json={
+            "contents": [{"parts": [{"text": prompt}]}]
+        }
+    )
+
+    data = r.json()
+    try:
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        text = text.strip()
+
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            text = text.replace("json", "", 1).strip()
+
+        return json.loads(text)
+    except Exception as e:
+        print("Gemini failure:", data)
+        return None
+    except:
+        print("Gemini raw response:", text)
+        return None
+
+
+
 if __name__ == "__main__":
     # Validate environment variables
     if not CLIENT_ID or not CLIENT_SECRET:
-        print("\n❌ Error: Spotify credentials not set!")
         print("\nPlease set the following environment variables:")
         print("  export SPOTIFY_CLIENT_ID='your-client-id'")
         print("  export SPOTIFY_CLIENT_SECRET='your-client-secret'")
