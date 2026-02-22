@@ -66,12 +66,24 @@ tools = types.Tool(
 )
 
 
+def needs_tools(question: str) -> bool:
+    keywords = [
+        "song info", "song information", "artist info", "artist information",
+        "similar artists", "similar songs", "chord tutorial", "tutorial",
+    ]
+    q = question.lower()
+    return any(kw in q for kw in keywords)
+
+
 async def ask_gemini(question: str) -> str:
     gemini = genai.Client(api_key=GEMINI_API_KEY)
     system_prompt = """
                     You are a music assistant. Given a question, use the tools specified to answer the question. If the tools cannot answer the question, then answer the question without them.
                     """
     config = types.GenerateContentConfig(tools=[tools], system_instruction=system_prompt)
+
+    if not needs_tools(question):
+        question = question + " (do not use tools)"
 
     async with sse_client(MCP_SERVER_URL) as (read, write):
         async with ClientSession(read, write) as session:
