@@ -110,11 +110,19 @@ document.addEventListener('DOMContentLoaded', () => {
         messages.scrollTop = messages.scrollHeight;
 
         try {
+            // Grab currently displayed track & artist
+            const trackName = document.getElementById('track-name').textContent || '';
+            const artistName = document.getElementById('artist-name').textContent || '';
+
             const response = await fetch('http://127.0.0.1:5000/chat', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text })
+                body: JSON.stringify({
+                    message: text,
+                    current_track: trackName,
+                    current_artist: artistName
+                })
             });
 
             if (!response.ok) throw new Error(`HTTP ${response.status}`);

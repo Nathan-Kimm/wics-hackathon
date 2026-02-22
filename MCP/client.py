@@ -66,24 +66,21 @@ tools = types.Tool(
 )
 
 
-def needs_tools(question: str) -> bool:
-    keywords = [
-        "song info", "song information", "artist info", "artist information",
-        "similar artists", "similar songs", "chord tutorial", "tutorial",
-    ]
-    q = question.lower()
-    return any(kw in q for kw in keywords)
 
-
-async def ask_gemini(question: str) -> str:
+async def ask_gemini(question: str, current_track: str = "", current_artist: str = "") -> str:
     gemini = genai.Client(api_key=GEMINI_API_KEY)
-    system_prompt = """
-                    You are a music assistant. Given a question, use the tools specified to answer the question. If the tools cannot answer the question, then answer the question without them.
-                    """
-    config = types.GenerateContentConfig(tools=[tools], system_instruction=system_prompt)
 
-    if not needs_tools(question):
-        question = question + " (do not use tools)"
+    track_context = ""
+    if current_track and current_artist:
+        track_context = f'\nThe user is currently listening to "{current_track}" by {current_artist}. When they say "this song", "current song", or "what I\'m listening to", they mean this track.'
+
+    system_prompt = f"""You are a music-only assistant. You ONLY answer questions related to music, songs, artists, albums, genres, chords, guitar tutorials, and music recommendations.
+If a user asks about anything that is NOT related to music, politely decline and say you can only help with music-related topics.
+Use the provided tools whenever possible to look up song info, artist info, similar songs, similar artists, and chord tutorials.
+Keep your answers concise and helpful.
+{track_context}"""
+
+    config = types.GenerateContentConfig(tools=[tools], system_instruction=system_prompt)
 
     async with sse_client(MCP_SERVER_URL) as (read, write):
         async with ClientSession(read, write) as session:
