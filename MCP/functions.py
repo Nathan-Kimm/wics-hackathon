@@ -2,17 +2,10 @@
 - get_guitar_chords: Scrape Guitar Chords with Lyrics from https://www.ultimate-guitar.com/
 - get_artist_info: Gets infomation about artist scrapes from wikepedia API (summary)
 - get_song_info: Gets information about song scrapes from wikepedia API (summary)
-<<<<<<< Updated upstream
 - get_similar_songs: Returns similar songs (https://www.music-map.com/)
 - get_song_chords_tutorial: Returns a YouTube link to a guitar chord tutorial for a song
 - get_difficulty_rating: Returns an estimated guitar difficulty rating for a song from Ultimate Guitar
 - get_similar_songs_spotify: Returns Spotify links for the top 5 most similar songs
-=======
-- get_similar_artists: Returns similar artists (https://www.music-map.com/)
-- get_echords_chords: Scrape Guitar Chords with Lyrics from https://www.e-chords.com/
-- get_spotify_stuff:
-    -
->>>>>>> Stashed changes
 """
 
 import os
@@ -21,12 +14,60 @@ import requests
 from urllib.parse import quote, unquote
 from bs4 import BeautifulSoup
 
-def get_song_info(song_name: str) -> str:
-    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{requests.utils.quote(song_name)}"
-    r = requests.get(url, headers={"User-Agent": "MusicMCP/1.0"})
-    if r.status_code == 200:
-        return r.json().get("extract", "No summary found.")
-    return f"Could not find information for '{song_name}'."
+def get_song_info(song_name: str, artist_name: str = "") -> str:
+    headers = {"User-Agent": "MusicMCP/1.0"}
+
+    # Build search queries to try, most specific first
+    search_queries = []
+    if artist_name:
+        search_queries.append(f"{song_name} {artist_name} song")
+        search_queries.append(f"{song_name} ({artist_name} song)")
+    search_queries.append(f"{song_name} song")
+    search_queries.append(song_name)
+
+    for query in search_queries:
+        # Use Wikipedia's search API to find the best matching page
+        search_url = "https://en.wikipedia.org/w/api.php"
+        params = {
+            "action": "query",
+            "list": "search",
+            "srsearch": query,
+            "format": "json",
+            "srlimit": 5,
+        }
+        r = requests.get(search_url, params=params, headers=headers)
+        if r.status_code != 200:
+            continue
+
+        results = r.json().get("query", {}).get("search", [])
+        if not results:
+            continue
+
+        # Look for a result that seems music-related
+        best_title = None
+        for result in results:
+            title_lower = result["title"].lower()
+            snippet_lower = result.get("snippet", "").lower()
+            # Prefer results mentioning song, single, album, or the artist
+            if any(kw in title_lower or kw in snippet_lower for kw in
+                   ["song", "single", "album", "music", "track", artist_name.lower()] if kw):
+                best_title = result["title"]
+                break
+
+        if not best_title and results:
+            best_title = results[0]["title"]
+
+        if best_title:
+            # Fetch the summary for the best matching page
+            summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{requests.utils.quote(best_title)}"
+            r = requests.get(summary_url, headers=headers)
+            if r.status_code == 200:
+                data = r.json()
+                extract = data.get("extract", "")
+                if extract:
+                    return extract
+
+    return f"Could not find information for '{song_name}'" + (f" by '{artist_name}'" if artist_name else "") + "."
 
 def get_artist_info(artist_name: str) -> str:
     url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{requests.utils.quote(artist_name)}"
@@ -67,7 +108,6 @@ def get_similar_artists(artist_name: str) -> str:
         return f"No similar artists found for '{artist_name}'."
     return "Similar artists: " + ", ".join(top_10)
 
-<<<<<<< Updated upstream
 def get_song_chords_tutorial(song_name: str, artist: str) -> str:
     query = f"{song_name} {artist} guitar chords tutorial"
     url = f"https://www.youtube.com/results?search_query={quote(query)}"
@@ -121,7 +161,6 @@ def get_similar_songs(song_name: str, artist_name: str) -> str:
         return f"No similar songs found for '{song_name}' by '{artist_name}'."
     return "Similar songs: " + ", ".join(top_5)
 
-=======
 def get_echords_chords(song_name: str, artist_name: str = "") -> str:
     """
     Scrape guitar chords from e-chords.com for a given song.
@@ -205,4 +244,3 @@ def get_echords_chords(song_name: str, artist_name: str = "") -> str:
         return f"Error accessing e-chords.com: {str(e)}"
     except Exception as e:
         return f"Unexpected error: {str(e)}"
->>>>>>> Stashed changes

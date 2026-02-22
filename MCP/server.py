@@ -1,12 +1,12 @@
 from fastmcp import FastMCP
-from functions import get_song_info, get_artist_info, get_similar_artists, get_song_chords_tutorial, get_similar_songs
+from functions import get_song_info, get_artist_info, get_similar_artists, get_song_chords_tutorial, get_similar_songs, get_echords_chords
 
 mcp = FastMCP("Music")
 
 @mcp.tool()
-def song_info(song_name: str) -> str:
-    """Get information about a song by name."""
-    return get_song_info(song_name)
+def song_info(song_name: str, artist_name: str = "") -> str:
+    """Get information about a song. Provide the artist name for better results."""
+    return get_song_info(song_name, artist_name)
 
 @mcp.tool()
 def artist_info(artist_name: str) -> str:

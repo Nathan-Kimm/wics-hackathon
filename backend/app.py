@@ -114,8 +114,11 @@ def chat():
     if not message:
         return jsonify({"error": "No message provided"}), 400
 
+    current_track = body.get("current_track", "")
+    current_artist = body.get("current_artist", "")
+
     try:
-        reply = asyncio.run(ask_gemini(message))
+        reply = asyncio.run(ask_gemini(message, current_track=current_track, current_artist=current_artist))
         return jsonify({"reply": reply})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
